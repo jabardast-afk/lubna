@@ -8,7 +8,7 @@ APP_NAME = "Lubna"
 APP_URL = "https://lubna.pages.dev"
 FRONTEND_ORIGIN = "https://lubna.pages.dev"
 GOOGLE_REDIRECT_URI = "https://lubna-worker.sandeepkumarbtech2012.workers.dev/auth/callback"
-GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"
+GOOGLE_CLIENT_ID = "245236117299-hpbhch5kqk5opnbgeqci2v4fhl59m4fu.apps.googleusercontent.com"
 
 [[kv_namespaces]]
 binding = "KV"

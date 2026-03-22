@@ -92,8 +92,8 @@ Click `Save and Deploy`.
 2. Open `Variables and Secrets`.
 3. Add **Variables**:
 - `GOOGLE_CLIENT_ID` = your Google OAuth client id
-- `GOOGLE_REDIRECT_URI` = `https://api.lubna.app/auth/callback`
-- `APP_URL` = `https://lubna.app`
+- `GOOGLE_REDIRECT_URI` = `https://lubna-worker.sandeepkumarbtech2012.workers.dev/auth/callback`
+- `APP_URL` = `https://lubna.pages.dev`
 
 4. Add **Secrets**:
 - `GOOGLE_CLIENT_SECRET` = your Google OAuth client secret
@@ -135,27 +135,19 @@ Set:
 
 ### 6.3 Environment Variables (Pages)
 Add in both Production and Preview:
-- `VITE_API_BASE` = `https://api.lubna.app`
+- `VITE_API_BASE` = `https://lubna-worker.sandeepkumarbtech2012.workers.dev`
 
 Click `Save and Deploy`.
 
 ---
 
-## 7. Attach Custom Domains (UI)
+## 7. Domain Setup (Current Plan)
 
-### 7.1 Pages Domain
-1. Open Pages project.
-2. `Custom domains` → `Set up a custom domain`.
-3. Add `lubna.app`.
-4. Finish DNS wizard.
+Using default Cloudflare hostnames for now:
+- Frontend: `https://lubna.pages.dev`
+- Worker API: `https://lubna-worker.sandeepkumarbtech2012.workers.dev`
 
-### 7.2 Worker Domain
-1. Open Worker `lubna-worker`.
-2. `Settings` → `Triggers` or `Domains & Routes`.
-3. Add custom domain `api.lubna.app`.
-4. Save.
-
-Wait until SSL/TLS shows active for both.
+No custom domain setup needed in this phase.
 
 ---
 
@@ -164,17 +156,17 @@ Wait until SSL/TLS shows active for both.
 In Google Cloud Console:
 1. Open OAuth 2.0 Client ID used by Lubna.
 2. Add Authorized redirect URI:
-- `https://api.lubna.app/auth/callback`
+- `https://lubna-worker.sandeepkumarbtech2012.workers.dev/auth/callback`
 3. Save.
 
 If needed, add origin:
-- `https://lubna.app`
+- `https://lubna.pages.dev`
 
 ---
 
 ## 9. First Live Test
 
-1. Open `https://lubna.app`.
+1. Open `https://lubna.pages.dev`.
 2. Click `Continue with Google`.
 3. Login and consent.
 4. Confirm redirect lands in app and session is active.
@@ -185,11 +177,12 @@ If needed, add origin:
 ## 10. Troubleshooting (Fast)
 
 ### Login returns error
-- Verify Google redirect URI exactly matches `https://api.lubna.app/auth/callback`.
+- Verify Google redirect URI exactly matches `https://lubna-worker.sandeepkumarbtech2012.workers.dev/auth/callback`.
 
 ### Unauthorized after login
 - Check Worker has `KV` binding and session cookie is being set.
-- Confirm frontend and API are same-site: `lubna.app` + `api.lubna.app`.
+- Note: `pages.dev` and `workers.dev` are cross-site, so strict cookies can fail in browser OAuth flows.
+- If this happens, move to same-site custom domains (`lubna.app` + `api.lubna.app`) and retry.
 
 ### Chat fails
 - Confirm D1 schema ran successfully.

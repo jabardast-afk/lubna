@@ -183,10 +183,12 @@ chatRoutes.post("/message", async (c) => {
   const language = body.language ?? detectLanguage(body.message);
   const memory = await listMemoryFacts(c.env, user.id);
   let reply: string;
+  let source: "gemini" | "fallback" = "gemini";
   try {
     reply = await generateWithGemini(c.env, user.id, body.message, language, body.module ?? "general", memory);
   } catch (error) {
     console.error("Gemini generation failed:", error);
+    source = "fallback";
     reply = buildFallbackReply(body.message, language, body.module ?? "general", memory);
   }
   const assistantMessage = await insertMessage(c.env, {
@@ -200,6 +202,7 @@ chatRoutes.post("/message", async (c) => {
   return c.json({
     reply: assistantMessage.content,
     language,
+    source,
     conversationId: activeConversation.id,
   });
 });

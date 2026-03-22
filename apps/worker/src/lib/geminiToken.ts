@@ -2,7 +2,7 @@ import type { Env } from "../env";
 
 interface StoredGeminiToken {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string | null;
   expires_at: number;
 }
 
@@ -13,6 +13,10 @@ export async function getFreshGeminiToken(userId: string, env: Env): Promise<str
   const token = JSON.parse(raw) as StoredGeminiToken;
   if (token.expires_at > Date.now() + 60_000) {
     return token.access_token;
+  }
+
+  if (!token.refresh_token) {
+    throw new Error("Gemini token expired and no refresh token available");
   }
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
@@ -33,7 +37,7 @@ export async function getFreshGeminiToken(userId: string, env: Env): Promise<str
   const data = (await res.json()) as { access_token: string; expires_in: number };
   const refreshed: StoredGeminiToken = {
     access_token: data.access_token,
-    refresh_token: token.refresh_token,
+    refresh_token: token.refresh_token ?? null,
     expires_at: Date.now() + data.expires_in * 1000
   };
   await env.KV.put(`user:${userId}:gemini_token`, JSON.stringify(refreshed));

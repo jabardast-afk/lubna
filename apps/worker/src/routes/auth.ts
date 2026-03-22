@@ -98,16 +98,18 @@ async function callbackHandler(c: Context<AppBindings>) {
 
   const profile = (await profileResponse.json()) as GoogleProfile;
   const user = await upsertGoogleUser(c.env, profile);
-  if (tokenJson.refresh_token) {
-    await c.env.KV.put(
-      `user:${profile.sub}:gemini_token`,
-      JSON.stringify({
-        access_token: tokenJson.access_token,
-        refresh_token: tokenJson.refresh_token,
-        expires_at: Date.now() + (tokenJson.expires_in ?? 3600) * 1000
-      })
-    );
-  }
+  const existingTokenRaw = await c.env.KV.get(`user:${profile.sub}:gemini_token`);
+  const existingToken = existingTokenRaw
+    ? (JSON.parse(existingTokenRaw) as { refresh_token?: string })
+    : null;
+  await c.env.KV.put(
+    `user:${profile.sub}:gemini_token`,
+    JSON.stringify({
+      access_token: tokenJson.access_token,
+      refresh_token: tokenJson.refresh_token ?? existingToken?.refresh_token ?? null,
+      expires_at: Date.now() + (tokenJson.expires_in ?? 3600) * 1000
+    })
+  );
   await createSession(c, {
     userId: user.id,
     email: user.email,

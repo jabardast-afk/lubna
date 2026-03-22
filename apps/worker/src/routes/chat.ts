@@ -11,11 +11,46 @@ function normalizeLimit(value: string | undefined, fallback = 20): number {
   return Math.max(1, Math.min(100, parsed));
 }
 
-function buildAssistantReply(message: string, memory: Awaited<ReturnType<typeof listMemoryFacts>>): string {
-  const memoryHighlights = memory.slice(0, 3).map((fact) => `${fact.key}: ${fact.value}`).join("; ");
-  const prefix = "I hear you, and I’ve got you. ";
-  const insight = memoryHighlights ? `I'm remembering ${memoryHighlights}. ` : "";
-  return `${prefix}${insight}Tell me a bit more so we can figure this out together. You said: "${message}".`;
+function isIdentityQuestion(message: string): boolean {
+  const lower = message.toLowerCase();
+  return /\bwho are you\b/.test(lower) || /tum (kaun|kon) ho/.test(lower) || /aap kaun ho/.test(lower);
+}
+
+function isDistressMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return /(dimag kharab|stressed|anxious|tensed|pareshan|bura lag raha|overwhelmed)/.test(lower);
+}
+
+function buildAssistantReply(
+  message: string,
+  language: string,
+  module: AppModule,
+  memory: Awaited<ReturnType<typeof listMemoryFacts>>
+): string {
+  const memoryHint = memory[0] ? `Also, I remember ${memory[0].key}: ${memory[0].value}. ` : "";
+  if (isIdentityQuestion(message)) {
+    if (language === "hi" || language === "hinglish") {
+      return "Main Lubna hoon, tumhari AI bestie. Main sunungi bhi, practical help bhi dungi, aur bina judge kiye saath rahoongi. Bolo, abhi kis cheez mein help chahiye?";
+    }
+    return "I’m Lubna, your AI bestie. I’m here to listen, help you think clearly, and support you without judgment. What do you need right now?";
+  }
+
+  if (isDistressMessage(message)) {
+    if (language === "hi" || language === "hinglish") {
+      return `${memoryHint}Aaj ka din heavy lag raha hai, I get it. Chalo 2 minute reset karte hain: 1) 5 deep breaths, 2) paani ka ek glass, 3) jo sabse urgent tension hai woh ek line mein batao. Usko abhi saath mein solve karte hain.`;
+    }
+    return `${memoryHint}That sounds really heavy, and I’m with you. Let’s do a 2-minute reset: 1) five deep breaths, 2) a glass of water, 3) tell me the single most urgent stress point. We’ll tackle that first.`;
+  }
+
+  if (module === "career") {
+    return language === "hi" || language === "hinglish"
+      ? `${memoryHint}Career mode on. Situation 2 lines mein batao: kya hua, kiske saath hua. Main exact script aur next step bana deti hoon.`
+      : `${memoryHint}Career mode on. Tell me the situation in two lines: what happened and with whom. I’ll give you an exact script and next step.`;
+  }
+
+  return language === "hi" || language === "hinglish"
+    ? `${memoryHint}Samajh rahi hoon. Main tumhare saath hoon. Chalo short mein batate hain: abhi tumhe vent karna hai ya direct solution chahiye?`
+    : `${memoryHint}I hear you and I’m with you. Do you want to vent first, or do you want a direct step-by-step solution?`;
 }
 
 function detectLanguage(message: string): string {
@@ -80,9 +115,9 @@ chatRoutes.post("/message", async (c) => {
     language: body.language ?? detectLanguage(body.message)
   });
 
-  const memory = await listMemoryFacts(c.env, user.id);
-  const reply = buildAssistantReply(body.message, memory);
   const language = body.language ?? detectLanguage(body.message);
+  const memory = await listMemoryFacts(c.env, user.id);
+  const reply = buildAssistantReply(body.message, language, body.module ?? "general", memory);
   const assistantMessage = await insertMessage(c.env, {
     conversationId: activeConversation.id,
     role: "assistant",

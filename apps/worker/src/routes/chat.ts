@@ -146,7 +146,7 @@ chatRoutes.post("/message", async (c) => {
     language
   });
 
-  c.executionCtx.waitUntil(extractSimpleMemory(c.env, user.id, body.message));
+  c.executionCtx?.waitUntil(extractSimpleMemory(c.env, user.id, body.message));
   return c.json({
     reply: assistantMessage.content,
     language,

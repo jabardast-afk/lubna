@@ -12,9 +12,9 @@ GOOGLE_CLIENT_ID = "245236117299-hpbhch5kqk5opnbgeqci2v4fhl59m4fu.apps.googleuse
 
 [[kv_namespaces]]
 binding = "KV"
-id = "replace-me"
+id = "c77ed49fdb49416389195289a80b8b12"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "lubna-db"
-database_id = "replace-me"
+database_id = "baa0807c-b4a7-4df9-a38d-b055f6849789"

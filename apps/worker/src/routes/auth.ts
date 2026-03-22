@@ -36,7 +36,7 @@ async function startGoogleAuth(c: Context<AppBindings>) {
     client_id: c.env.GOOGLE_CLIENT_ID,
     redirect_uri: c.env.GOOGLE_REDIRECT_URI,
     response_type: "code",
-    scope: "openid email profile https://www.googleapis.com/auth/generative-language.retriever",
+    scope: "openid email profile https://www.googleapis.com/auth/cloud-platform",
     access_type: "offline",
     prompt: "consent",
     state,

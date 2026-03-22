@@ -35,6 +35,15 @@ export function useChat() {
         createdAt: Date.now()
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to get AI response right now.";
+      const assistantMessage: ChatMessage = {
+        id: uid(),
+        role: "assistant",
+        content: message,
+        createdAt: Date.now()
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
     } finally {
       setLoading(false);
     }

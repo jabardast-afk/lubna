@@ -21,7 +21,8 @@ export async function sendChatMessage(payload: ChatRequest): Promise<ChatRespons
   });
 
   if (!res.ok) {
-    throw new Error("Chat failed");
+    const errorPayload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+    throw new Error(errorPayload?.detail ?? errorPayload?.error ?? "Chat failed");
   }
 
   return res.json() as Promise<ChatResponse>;

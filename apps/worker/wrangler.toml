@@ -1,0 +1,22 @@
+name = "lubna-worker"
+main = "src/index.ts"
+compatibility_date = "2026-03-22"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+APP_NAME = "Lubna"
+GOOGLE_REDIRECT_URI = "https://lubna.app/auth/callback"
+GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "replace-me"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lubna-db"
+database_id = "replace-me"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "lubna-media"

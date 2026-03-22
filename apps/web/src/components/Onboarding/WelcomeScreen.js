@@ -1,0 +1,8 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import GoogleSignIn from "./GoogleSignIn";
+function RoseMark() {
+    return (_jsxs("svg", { viewBox: "0 0 120 120", className: "h-24 w-24 animate-fadeRise", children: [_jsx("defs", { children: _jsxs("linearGradient", { id: "rose", x1: "0%", y1: "0%", x2: "100%", y2: "100%", children: [_jsx("stop", { offset: "0%", stopColor: "#D4A853" }), _jsx("stop", { offset: "100%", stopColor: "#C9748A" })] }) }), _jsx("path", { d: "M60 8L76 28L102 36L90 60L102 84L76 92L60 112L44 92L18 84L30 60L18 36L44 28Z", fill: "url(#rose)", opacity: "0.35" }), _jsx("path", { d: "M60 23C73 23 83 34 83 47C83 59 75 66 67 72C64 74 62 77 60 81C58 77 56 74 53 72C45 66 37 59 37 47C37 34 47 23 60 23Z", fill: "none", stroke: "url(#rose)", strokeWidth: "4" }), _jsx("circle", { cx: "60", cy: "47", r: "8", fill: "url(#rose)" })] }));
+}
+export default function WelcomeScreen({ onLogin }) {
+    return (_jsx("main", { className: "mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-6", children: _jsxs("div", { className: "glass-card w-full max-w-xl rounded-3xl p-8 text-center shadow-glow md:p-12", children: [_jsx("div", { className: "mx-auto mb-6 w-fit", children: _jsx(RoseMark, {}) }), _jsx("h1", { className: "font-display text-6xl leading-none text-text-primary md:text-7xl", children: "Meet Lubna" }), _jsx("p", { className: "mx-auto mt-3 max-w-md text-lg text-text-secondary", children: "Your bestie, your assistant, your safe space" }), _jsx("div", { className: "mx-auto mt-10 max-w-sm", children: _jsx(GoogleSignIn, { onClick: onLogin }) })] }) }));
+}

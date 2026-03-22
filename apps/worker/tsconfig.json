@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["@cloudflare/workers-types"],
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@lubna/shared": ["../../packages/shared/index.ts"],
+      "@lubna/shared/*": ["../../packages/shared/*"],
+      "@lubna/shared/types": ["../../packages/shared/types.ts"],
+      "@lubna/shared/constants": ["../../packages/shared/constants.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

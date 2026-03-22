@@ -137,3 +137,17 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Monorepo build outputs
+apps/**/dist/
+apps/**/.wrangler/
+apps/**/.turbo/
+packages/**/dist/
+
+# Capacitor native projects (generated)
+apps/web/ios/
+apps/web/android/
+
+# Local tooling
+.DS_Store
+.idea/

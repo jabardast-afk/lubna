@@ -69,12 +69,17 @@ async function generateWithGemini(
   memory: Awaited<ReturnType<typeof listMemoryFacts>>
 ): Promise<string> {
   const token = await getFreshGeminiToken(userId, env);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  };
+  if (env.GOOGLE_CLOUD_PROJECT_ID && env.GOOGLE_CLOUD_PROJECT_ID !== "SET_ME") {
+    headers["x-goog-user-project"] = env.GOOGLE_CLOUD_PROJECT_ID;
+  }
+
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
+    headers,
     body: JSON.stringify({
       system_instruction: {
         parts: [{ text: buildSystemPrompt(language, module, memory) }]
@@ -130,10 +135,11 @@ chatRoutes.post("/message", async (c) => {
     reply = await generateWithGemini(c.env, user.id, body.message, language, body.module ?? "general", memory);
   } catch (error) {
     console.error("Gemini generation failed:", error);
+    const detail = error instanceof Error ? error.message : "Unknown Gemini failure";
     return c.json(
       {
         error: "ai_generation_failed",
-        detail: "Lubna could not generate a response from Gemini. Please re-login once and try again."
+        detail
       },
       502
     );

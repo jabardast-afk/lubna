@@ -7,6 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 APP_NAME = "Lubna"
 APP_URL = "https://lubna.pages.dev"
 FRONTEND_ORIGIN = "https://lubna.pages.dev"
+GOOGLE_CLOUD_PROJECT_ID = "SET_ME"
 GOOGLE_REDIRECT_URI = "https://lubna-worker.sandeepkumarbtech2012.workers.dev/auth/callback"
 GOOGLE_CLIENT_ID = "245236117299-hpbhch5kqk5opnbgeqci2v4fhl59m4fu.apps.googleusercontent.com"
 

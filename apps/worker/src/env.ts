@@ -48,6 +48,7 @@ export interface Env {
   APP_NAME?: string;
   APP_URL?: string;
   FRONTEND_ORIGIN?: string;
+  GOOGLE_CLOUD_PROJECT_ID?: string;
   KV: KVNamespace;
   DB: D1Database;
   GOOGLE_CLIENT_ID: string;

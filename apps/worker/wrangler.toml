@@ -5,7 +5,9 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 APP_NAME = "Lubna"
-GOOGLE_REDIRECT_URI = "https://lubna.app/auth/callback"
+APP_URL = "https://lubna.pages.dev"
+FRONTEND_ORIGIN = "https://lubna.pages.dev"
+GOOGLE_REDIRECT_URI = "https://lubna-worker.sandeepkumarbtech2012.workers.dev/auth/callback"
 GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"
 
 [[kv_namespaces]]

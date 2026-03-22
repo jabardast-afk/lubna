@@ -47,6 +47,7 @@ export interface AppVariables {
 export interface Env {
   APP_NAME?: string;
   APP_URL?: string;
+  FRONTEND_ORIGIN?: string;
   KV: KVNamespace;
   DB: D1Database;
   STORAGE: R2Bucket;

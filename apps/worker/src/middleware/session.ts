@@ -9,7 +9,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 export function setSessionCookieValue(c: Context<AppBindings>, sessionId: string): void {
   setCookie(c, SESSION_COOKIE, sessionId, {
     httpOnly: true,
-    sameSite: "Strict",
+    sameSite: "None",
     secure: true,
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
@@ -17,7 +17,11 @@ export function setSessionCookieValue(c: Context<AppBindings>, sessionId: string
 }
 
 export function clearSessionCookieValue(c: Context<AppBindings>): void {
-  deleteCookie(c, SESSION_COOKIE, { path: "/" });
+  deleteCookie(c, SESSION_COOKIE, {
+    path: "/",
+    secure: true,
+    sameSite: "None"
+  });
 }
 
 export async function createSession(c: Context<AppBindings>, data: Omit<SessionPayload, "id" | "createdAt">): Promise<SessionPayload> {

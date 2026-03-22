@@ -18,7 +18,3 @@ id = "replace-me"
 binding = "DB"
 database_name = "lubna-db"
 database_id = "replace-me"
-
-[[r2_buckets]]
-binding = "STORAGE"
-bucket_name = "lubna-media"

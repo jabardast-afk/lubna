@@ -29,14 +29,6 @@ Make sure:
 3. Name: `lubna-db`.
 4. Click `Create`.
 
-### 1.3 Create R2 Bucket
-1. In `Storage & Databases`, click `R2`.
-2. Click `Create bucket`.
-3. Name: `lubna-media`.
-4. Click `Create bucket`.
-
----
-
 ## 2. Deploy Worker From GitHub (UI)
 
 ### 2.1 Create Worker via Git Import
@@ -75,11 +67,6 @@ Click `Save and Deploy`.
 - Type: `D1 Database`
 - Variable name: `DB`
 - Database: `lubna-db`
-
-### 3.3 R2 Binding
-- Type: `R2 Bucket`
-- Variable name: `STORAGE`
-- Bucket: `lubna-media`
 
 5. Click `Save`.
 6. Click `Deploy`.
@@ -186,7 +173,7 @@ If needed, add origin:
 
 ### Chat fails
 - Confirm D1 schema ran successfully.
-- Confirm Worker bindings: `DB`, `KV`, `STORAGE`.
+- Confirm Worker bindings: `DB`, `KV`.
 
 ### Pages deploy fails
 - Recheck build command/output directory.

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppBindings, ChatInput } from "../env";
 import type { AppModule } from "@lubna/shared/types";
 import { ensureConversation, getMessagesForUser, insertMessage, listMemoryFacts, upsertMemoryFact } from "../lib/d1";
+import { getFreshGeminiToken } from "../lib/geminiToken";
 
 function normalizeLimit(value: string | undefined, fallback = 20): number {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -21,7 +22,7 @@ function isDistressMessage(message: string): boolean {
   return /(dimag kharab|stressed|anxious|tensed|pareshan|bura lag raha|overwhelmed)/.test(lower);
 }
 
-function buildAssistantReply(
+function buildFallbackReply(
   message: string,
   language: string,
   module: AppModule,
@@ -51,6 +52,70 @@ function buildAssistantReply(
   return language === "hi" || language === "hinglish"
     ? `${memoryHint}Samajh rahi hoon. Main tumhare saath hoon. Chalo short mein batate hain: abhi tumhe vent karna hai ya direct solution chahiye?`
     : `${memoryHint}I hear you and I’m with you. Do you want to vent first, or do you want a direct step-by-step solution?`;
+}
+
+function buildSystemPrompt(language: string, module: AppModule, memory: Awaited<ReturnType<typeof listMemoryFacts>>): string {
+  const memoryContext = memory.slice(0, 8).map((m) => `- ${m.key}: ${m.value}`).join("\n") || "(none yet)";
+  return [
+    "You are Lubna: a warm, practical AI best friend for women.",
+    "Never say you are a language model. Never parrot the user's message back verbatim.",
+    "Respond in the same language/style as user input.",
+    "If user writes Hinglish, respond in natural Hinglish.",
+    "Be emotionally intelligent: validate first, then help concretely.",
+    "If asked factual questions (science, career, etc.), give clear, useful explanations.",
+    `Current language hint: ${language}.`,
+    `Current module: ${module}.`,
+    "Known memory:",
+    memoryContext
+  ].join("\n");
+}
+
+async function generateWithGemini(
+  env: AppBindings["Bindings"],
+  userId: string,
+  message: string,
+  language: string,
+  module: AppModule,
+  memory: Awaited<ReturnType<typeof listMemoryFacts>>
+): Promise<string> {
+  const token = await getFreshGeminiToken(userId, env);
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{ text: buildSystemPrompt(language, module, memory) }]
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: message }]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.8,
+        topP: 0.95,
+        maxOutputTokens: 700
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const bodyText = await res.text();
+    throw new Error(`Gemini request failed: ${res.status} ${bodyText}`);
+  }
+
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
+  if (!text) {
+    throw new Error("Gemini returned empty response");
+  }
+  return text;
 }
 
 function detectLanguage(message: string): string {
@@ -117,7 +182,13 @@ chatRoutes.post("/message", async (c) => {
 
   const language = body.language ?? detectLanguage(body.message);
   const memory = await listMemoryFacts(c.env, user.id);
-  const reply = buildAssistantReply(body.message, language, body.module ?? "general", memory);
+  let reply: string;
+  try {
+    reply = await generateWithGemini(c.env, user.id, body.message, language, body.module ?? "general", memory);
+  } catch (error) {
+    console.error("Gemini generation failed:", error);
+    reply = buildFallbackReply(body.message, language, body.module ?? "general", memory);
+  }
   const assistantMessage = await insertMessage(c.env, {
     conversationId: activeConversation.id,
     role: "assistant",

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import VoiceButton from "./VoiceButton";
 
 interface InputBarProps {
@@ -11,9 +11,15 @@ interface InputBarProps {
 export default function InputBar({ onSend, voiceActive, onVoiceToggle, liveTranscript }: InputBarProps) {
   const [value, setValue] = useState("");
 
+  useEffect(() => {
+    if (voiceActive) {
+      setValue(liveTranscript ?? "");
+    }
+  }, [liveTranscript, voiceActive]);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const message = value.trim() || liveTranscript?.trim();
+    const message = value.trim();
     if (!message) return;
     setValue("");
     await onSend(message);
@@ -22,7 +28,7 @@ export default function InputBar({ onSend, voiceActive, onVoiceToggle, liveTrans
   return (
     <form onSubmit={submit} className="glass-card flex items-end gap-3 rounded-2xl p-3">
       <textarea
-        value={value || liveTranscript || ""}
+        value={value}
         onChange={(event) => setValue(event.target.value)}
         rows={1}
         placeholder="Tell Lubna what’s on your mind..."

@@ -25,6 +25,14 @@ export default function ChatPage() {
   const voice = useVoice();
   const memory = useMemory();
 
+  const handleVoiceStopAndSend = async () => {
+    const spoken = (await voice.stop()).trim();
+    if (spoken) {
+      await sendMessage(spoken);
+      voice.clearTranscript();
+    }
+  };
+
   if (authLoading) {
     return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
   }
@@ -87,7 +95,7 @@ export default function ChatPage() {
           <InputBar
             onSend={sendMessage}
             voiceActive={voice.isListening}
-            onVoiceToggle={() => (voice.isListening ? voice.stop() : voice.start())}
+            onVoiceToggle={() => (voice.isListening ? handleVoiceStopAndSend() : voice.start())}
             liveTranscript={voice.transcript}
           />
         </div>
@@ -97,7 +105,7 @@ export default function ChatPage() {
         <button
           type="button"
           className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg-primary/95"
-          onClick={voice.stop}
+          onClick={handleVoiceStopAndSend}
         >
           <span className="h-40 w-40 animate-pulseRose rounded-full bg-gradient-to-br from-accent-gold to-accent-rose shadow-glow" />
           <p className="mt-8 max-w-lg px-6 text-center text-lg text-text-secondary">

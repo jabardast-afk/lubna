@@ -22,6 +22,7 @@ export function useVoice() {
   const { isNative } = usePlatform();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const transcriptRef = useRef("");
   const recognitionRef = useRef<WebRecognition | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function useVoice() {
 
   const start = async () => {
     setTranscript("");
+    transcriptRef.current = "";
     if (isNative) {
       const perms = await SpeechRecognition.requestPermissions();
       if (perms.speechRecognition !== "granted") return;
@@ -43,7 +45,10 @@ export function useVoice() {
         popup: false
       });
       SpeechRecognition.addListener("partialResults", (result) => {
-        if (result.matches?.[0]) setTranscript(result.matches[0]);
+        if (result.matches?.[0]) {
+          transcriptRef.current = result.matches[0];
+          setTranscript(result.matches[0]);
+        }
       });
       return;
     }
@@ -57,6 +62,7 @@ export function useVoice() {
       const text = Array.from(event.results)
         .map((r: any) => r[0].transcript)
         .join(" ");
+      transcriptRef.current = text;
       setTranscript(text);
     };
     recognition.onend = () => setIsListening(false);
@@ -70,11 +76,17 @@ export function useVoice() {
       await SpeechRecognition.stop();
       await SpeechRecognition.removeAllListeners();
       setIsListening(false);
-      return;
+      return transcriptRef.current;
     }
     recognitionRef.current?.stop();
     setIsListening(false);
+    return transcriptRef.current;
   };
 
-  return { isListening, transcript, start, stop };
+  const clearTranscript = () => {
+    transcriptRef.current = "";
+    setTranscript("");
+  };
+
+  return { isListening, transcript, start, stop, clearTranscript };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AppModule, ChatMessage } from "@lubna/shared/types";
-import { finalizeConversation, getConversationHistory, sendChatMessage } from "@/lib/gemini";
+import { finalizeConversation, finalizeConversationKeepalive, getConversationHistory, sendChatMessage } from "@/lib/gemini";
 
 function uid() {
   return crypto.randomUUID();
@@ -55,6 +55,30 @@ export function useChat() {
     })();
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const finalizeCurrentConversation = () => {
+      const activeConversationId = conversationIdRef.current;
+      if (!activeConversationId || !messagesRef.current.length) return;
+      void finalizeConversationKeepalive(activeConversationId).catch(() => undefined);
+    };
+
+    const handlePageHide = () => finalizeCurrentConversation();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        finalizeCurrentConversation();
+      }
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      finalizeCurrentConversation();
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

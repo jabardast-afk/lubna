@@ -1,6 +1,6 @@
 import type { AppModule, UserPrefs } from "@lubna/shared/types";
 import type { ConversationRow, ConversationSummaryRow, Env, GoogleProfile, MemoryRow, UserRecord } from "../env";
-import { deleteChatHistory } from "./kv";
+import { deleteChatHistory, deleteChatMemorySnapshot } from "./kv";
 
 function now(): number {
   return Date.now();
@@ -174,6 +174,7 @@ export async function pruneUserConversations(env: Env, userId: string, keep = 20
     await env.DB.prepare("DELETE FROM messages WHERE conversation_id = ?").bind(conversation.id).run();
     await env.DB.prepare("DELETE FROM conversations WHERE id = ? AND user_id = ?").bind(conversation.id, userId).run();
     await deleteChatHistory(env, userId, conversation.id);
+    await deleteChatMemorySnapshot(env, userId, conversation.id);
   }
 }
 

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { AppBindings, ChatInput } from "../env";
 import type { AppModule, ChatMessage } from "@lubna/shared/types";
 import {
@@ -6,12 +7,11 @@ import {
   getConversationById,
   getMessagesForUser,
   listConversations,
-  listMemoryFacts,
   pruneUserConversations,
   updateConversationSnapshot
 } from "../lib/d1";
 import { getFreshGeminiToken } from "../lib/geminiToken";
-import { readChatHistory, writeChatHistory } from "../lib/kv";
+import { readChatHistory, readChatMemorySnapshot, writeChatHistory, writeChatMemorySnapshot } from "../lib/kv";
 import { extractAndPersistMemories } from "./memory";
 
 function normalizeLimit(value: string | undefined, fallback = 20): number {
@@ -44,7 +44,7 @@ function parseChatInput(body: unknown): ChatInput | null {
   };
 }
 
-function buildSystemPrompt(language: string, module: AppModule, memory: Awaited<ReturnType<typeof listMemoryFacts>>): string {
+function buildSystemPrompt(language: string, module: AppModule, memory: Array<{ key: string; value: string }>): string {
   const memoryBlock = memory
     .slice(0, 15)
     .map((entry) => `- ${entry.key}: ${entry.value}`)
@@ -70,7 +70,7 @@ async function generateWithGemini(
   message: string,
   language: string,
   module: AppModule,
-  memory: Awaited<ReturnType<typeof listMemoryFacts>>
+  memory: Array<{ key: string; value: string }>
 ): Promise<string> {
   const token = await getFreshGeminiToken(userId, env);
   const headers: Record<string, string> = {
@@ -110,6 +110,27 @@ async function generateWithGemini(
   return text;
 }
 
+async function getConversationMemorySnapshot(
+  c: Context<AppBindings>,
+  userId: string,
+  conversationId: string,
+  isNewConversation: boolean
+): Promise<Array<{ key: string; value: string }>> {
+  if (isNewConversation) {
+    // New sessions always start by reading memory facts from D1 before the first Gemini call.
+    const memories = await c.env.DB.prepare(
+      "SELECT key, value FROM user_memory WHERE userId = ? ORDER BY updatedAt DESC LIMIT 15"
+    )
+      .bind(userId)
+      .all<{ key: string; value: string }>();
+    const snapshot = memories.results;
+    await writeChatMemorySnapshot(c.env, userId, conversationId, snapshot);
+    return snapshot;
+  }
+
+  return readChatMemorySnapshot(c.env, userId, conversationId);
+}
+
 function buildMessage(role: "user" | "assistant", content: string, language?: string): ChatMessage {
   return {
     id: crypto.randomUUID(),
@@ -129,6 +150,7 @@ chatRoutes.post("/message", async (c) => {
   const body = parseChatInput(c.get("parsedBody")) ?? parseChatInput(await c.req.json().catch(() => null));
   if (!body?.message.trim()) return c.json({ error: "message is required" }, 400);
 
+  const isNewConversation = !body.conversationId;
   const activeConversation = body.conversationId
     ? await getConversationById(c.env, user.id, body.conversationId)
     : await createConversation(c.env, user.id, body.message.slice(0, 48), body.module ?? "general");
@@ -139,7 +161,7 @@ chatRoutes.post("/message", async (c) => {
   const existingMessages = await readChatHistory(c.env, user.id, activeConversation.id);
   const userMessage = buildMessage("user", body.message, language);
 
-  const memory = await listMemoryFacts(c.env, user.id);
+  const memory = await getConversationMemorySnapshot(c, user.id, activeConversation.id, isNewConversation);
   let reply: string;
   try {
     reply = await generateWithGemini(c.env, user.id, body.message, language, body.module ?? "general", memory);
@@ -167,10 +189,6 @@ chatRoutes.post("/message", async (c) => {
     kvUpdatedAt: Date.now()
   });
   await pruneUserConversations(c.env, user.id, 20);
-
-  if (nextMessages.length >= 5 && nextMessages.length % 5 === 0) {
-    c.executionCtx?.waitUntil(extractAndPersistMemories(c, user.id, nextMessages));
-  }
 
   return c.json({
     reply: assistantMessage.content,

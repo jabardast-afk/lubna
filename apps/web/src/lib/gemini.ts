@@ -114,6 +114,14 @@ export async function finalizeConversation(conversationId: string) {
   return res.json();
 }
 
+export function finalizeConversationKeepalive(conversationId: string) {
+  return fetch(apiUrl(`/chat/conversations/${conversationId}/finalize`), {
+    method: "POST",
+    credentials: "include",
+    keepalive: true
+  });
+}
+
 export async function extractConversationMemory(messages: ConversationHistoryResponse["messages"]) {
   const res = await fetch(apiUrl("/api/memory/extract"), {
     method: "POST",

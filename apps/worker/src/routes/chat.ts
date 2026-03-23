@@ -14,6 +14,8 @@ import { getFreshGeminiToken } from "../lib/geminiToken";
 import { readChatHistory, readChatMemorySnapshot, writeChatHistory, writeChatMemorySnapshot } from "../lib/kv";
 import { extractAndPersistMemories } from "./memory";
 
+const FRIENDLY_RATE_LIMIT_REPLY = "Ugh, my brain's a little fried right now — give me a sec and try again!";
+
 function normalizeLimit(value: string | undefined, fallback = 20): number {
   const parsed = Number.parseInt(value ?? "", 10);
   if (!Number.isFinite(parsed)) return fallback;
@@ -64,6 +66,14 @@ Language hint: ${language}
 Module hint: ${module}`;
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimited(status: number, bodyText: string) {
+  return status === 429 || /RESOURCE_EXHAUSTED/i.test(bodyText);
+}
+
 async function generateWithGemini(
   env: AppBindings["Bindings"],
   userId: string,
@@ -81,33 +91,50 @@ async function generateWithGemini(
     headers["x-goog-user-project"] = env.GOOGLE_CLOUD_PROJECT_ID;
   }
 
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      system_instruction: {
-        parts: [{ text: buildSystemPrompt(language, module, memory) }]
-      },
-      contents: [{ role: "user", parts: [{ text: message }] }],
-      generationConfig: {
-        temperature: 0.8,
-        topP: 0.95,
-        maxOutputTokens: 900
-      }
-    })
-  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: buildSystemPrompt(language, module, memory) }]
+        },
+        contents: [{ role: "user", parts: [{ text: message }] }],
+        generationConfig: {
+          temperature: 0.8,
+          topP: 0.95,
+          maxOutputTokens: 900
+        }
+      })
+    });
 
-  if (!res.ok) {
+    if (res.ok) {
+      const data = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+      if (!text) throw new Error("Gemini returned empty response");
+      return text;
+    }
+
     const bodyText = await res.text();
+    if (isRateLimited(res.status, bodyText)) {
+      console.error("Gemini rate limit", { status: res.status, bodyText, attempt: attempt + 1 });
+      if (attempt === 0) {
+        await wait(5_000);
+        continue;
+      }
+      if (attempt === 1) {
+        await wait(10_000);
+        continue;
+      }
+      return FRIENDLY_RATE_LIMIT_REPLY;
+    }
+
     throw new Error(`Gemini request failed: ${res.status} ${bodyText}`);
   }
 
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
-  if (!text) throw new Error("Gemini returned empty response");
-  return text;
+  return FRIENDLY_RATE_LIMIT_REPLY;
 }
 
 async function getConversationMemorySnapshot(

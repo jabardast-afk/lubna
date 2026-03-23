@@ -67,7 +67,7 @@ async function extractWithGemini(c: Context<AppBindings>, userId: string, messag
     JSON.stringify(messages)
   ].join("\n");
 
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", {
     method: "POST",
     headers,
     body: JSON.stringify({

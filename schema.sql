@@ -1,3 +1,12 @@
+-- Lubna canonical schema
+-- This file is the single source of truth for the current final D1 schema.
+-- Legacy tables kept for compatibility:
+--   memory
+-- Current tables added for the Cloudflare refactor:
+--   user_memory
+--   user_preferences
+-- conversations now also stores message_count, last_message, and kv_updated_at.
+
 CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -40,6 +49,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_active INTEGER
 );
 
+-- Final persistent memory store used by the current app.
 CREATE TABLE IF NOT EXISTS user_memory (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
@@ -49,6 +59,7 @@ CREATE TABLE IF NOT EXISTS user_memory (
   UNIQUE (userId, key)
 );
 
+-- Final user preferences store used for voice/language/theme settings.
 CREATE TABLE IF NOT EXISTS user_preferences (
   userId TEXT PRIMARY KEY,
   voiceId TEXT,

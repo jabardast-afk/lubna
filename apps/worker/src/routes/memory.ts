@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import type { ChatMessage } from "@lubna/shared/types";
 import type { AppBindings } from "../env";
 import { deleteMemoryFact, getMemoryFact, listMemoryFacts, upsertMemoryFact } from "../lib/d1";
+import { getFreshGeminiToken } from "../lib/geminiToken";
 
 interface MemoryFactPayload {
   key: string;
@@ -47,6 +48,49 @@ function parseClaudeFacts(text: string): MemoryFactPayload[] {
   }
 }
 
+async function extractWithGemini(c: Context<AppBindings>, userId: string, messages: ChatMessage[]): Promise<MemoryFactPayload[]> {
+  const token = await getFreshGeminiToken(userId, c.env);
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    authorization: `Bearer ${token}`
+  };
+
+  if (c.env.GOOGLE_CLOUD_PROJECT_ID && c.env.GOOGLE_CLOUD_PROJECT_ID !== "SET_ME") {
+    headers["x-goog-user-project"] = c.env.GOOGLE_CLOUD_PROJECT_ID;
+  }
+
+  const prompt = [
+    "Extract 3 to 5 durable user memory facts from this chat.",
+    "Only include information about the user, never the assistant.",
+    "Prefer stable facts such as name, city, job, recent decisions, or mood patterns.",
+    "Return JSON only as an array of objects with exactly these keys: key, value.",
+    JSON.stringify(messages)
+  ].join("\n");
+
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.8,
+        maxOutputTokens: 300
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini memory extraction failed: ${response.status} ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = data.candidates?.[0]?.content?.parts?.map((item) => item.text ?? "").join("").trim() ?? "";
+  return parseClaudeFacts(text);
+}
+
 export async function extractAndPersistMemories(
   c: Context<AppBindings>,
   userId: string,
@@ -56,39 +100,10 @@ export async function extractAndPersistMemories(
   if (!recentMessages.length) return [];
 
   let facts: MemoryFactPayload[] = [];
-
-  if (c.env.ANTHROPIC_API_KEY) {
-    const prompt = [
-      "Extract 3 to 5 durable user memory facts from this chat.",
-      "Only include information about the user, not the assistant.",
-      "Return JSON only as an array of objects with key and value fields.",
-      "Examples of good facts: user's name, city, job, recent decisions, mood patterns.",
-      JSON.stringify(recentMessages)
-    ].join("\n");
-
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": c.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-sonnet-latest",
-        max_tokens: 300,
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
-
-    if (response.ok) {
-      const data = (await response.json()) as {
-        content?: Array<{ type?: string; text?: string }>;
-      };
-      const text = data.content?.find((item) => item.type === "text")?.text ?? "";
-      facts = parseClaudeFacts(text);
-    } else {
-      console.error("Claude memory extraction failed", await response.text());
-    }
+  try {
+    facts = await extractWithGemini(c, userId, recentMessages);
+  } catch (error) {
+    console.error("Gemini memory extraction failed", error);
   }
 
   if (!facts.length) {

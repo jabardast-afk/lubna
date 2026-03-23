@@ -60,7 +60,7 @@ Click `Save and Deploy`.
 
 ### 3.1 KV Binding
 - Type: `KV Namespace`
-- Variable name: `KV`
+- Variable name: `lubna_kv`
 - Namespace: `lubna-kv`
 
 ### 3.2 D1 Binding
@@ -105,13 +105,15 @@ Click `Save and Deploy`.
 
 ## 6. Deploy Pages Frontend From GitHub (UI)
 
-### 6.1 Create Pages Project
+### 6.1 Create Or Reconnect Pages Project
 1. Go to `Workers & Pages`.
 2. Click `Create application`.
 3. Choose `Pages`.
 4. Click `Connect to Git`.
 5. Select repo: `jabardast-afk/lubna`.
 6. Branch: `main`.
+
+If the project already exists and shows `No Git connection`, open the project, go to `Settings` -> `Builds & deployments`, and use `Connect to Git` there. If the UI does not offer that option, create a new Pages project from Git and move over to it.
 
 ### 6.2 Build Settings
 Set:

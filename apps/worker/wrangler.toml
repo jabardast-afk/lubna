@@ -13,9 +13,9 @@ GOOGLE_CLIENT_ID = "245236117299-hpbhch5kqk5opnbgeqci2v4fhl59m4fu.apps.googleuse
 
 [[kv_namespaces]]
 binding = "KV"
-id = "c77ed49fdb49416389195289a80b8b12"
+id = "REPLACE_WITH_KV_NAMESPACE_ID_FROM_CLOUDFLARE_DASHBOARD"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "lubna-db"
-database_id = "baa0807c-b4a7-4df9-a38d-b055f6849789"
+database_id = "REPLACE_WITH_D1_DATABASE_ID_FROM_CLOUDFLARE_DASHBOARD"

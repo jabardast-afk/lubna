@@ -1,7 +1,9 @@
 import { Navigate } from "react-router-dom";
+import { useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useChat } from "@/hooks/useChat";
 import { useVoice } from "@/hooks/useVoice";
+import { useSpeech } from "@/hooks/useSpeech";
 import { useMemory } from "@/hooks/useMemory";
 import ChatWindow from "@/components/Chat/ChatWindow";
 import InputBar from "@/components/Chat/InputBar";
@@ -23,15 +25,48 @@ export default function ChatPage() {
   const { session, loading: authLoading, logout } = useAuth();
   const { messages, loading, sendMessage, module, setModule } = useChat();
   const voice = useVoice();
+  const speech = useSpeech();
   const memory = useMemory();
+  const lastSpokenIdRef = useRef<string | null>(null);
+
+  const latestAssistantMessage = useMemo(
+    () => [...messages].reverse().find((message) => message.role === "assistant"),
+    [messages]
+  );
 
   const handleVoiceStopAndSend = async () => {
+    speech.stop();
     const spoken = (await voice.stop()).trim();
     if (spoken) {
       await sendMessage(spoken);
       voice.clearTranscript();
     }
   };
+
+  const handleQuickPrompt = async (prompt: string) => {
+    speech.stop();
+    await sendMessage(prompt);
+  };
+
+  const handleSpeakMessage = (message: (typeof messages)[number]) => {
+    if (message.role !== "assistant") return;
+    speech.speak(message.content);
+    lastSpokenIdRef.current = message.id;
+  };
+
+  const handleStopSpeaking = () => {
+    speech.stop();
+  };
+
+  useEffect(() => {
+    if (!latestAssistantMessage) return;
+    if (latestAssistantMessage.id === lastSpokenIdRef.current) return;
+    if (loading) return;
+    if (voice.isListening) return;
+    if (!speech.isSupported) return;
+    speech.speak(latestAssistantMessage.content);
+    lastSpokenIdRef.current = latestAssistantMessage.id;
+  }, [latestAssistantMessage, loading, speech, voice.isListening]);
 
   if (authLoading) {
     return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
@@ -50,7 +85,7 @@ export default function ChatPage() {
   return (
     <main className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-4 p-4 lg:grid-cols-[300px_1fr]">
       <aside className="hidden space-y-4 lg:block">
-        <ConversationList />
+        <ConversationList onSelectPrompt={handleQuickPrompt} />
         <ProfilePanel session={session} onLogout={logout} />
         <section className="glass-card rounded-2xl p-4">
           <h3 className="font-display text-2xl">Memory</h3>
@@ -73,6 +108,18 @@ export default function ChatPage() {
               <p className="text-sm text-text-secondary">Your AI bestie who always has your back</p>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={speech.stop}
+              className="rounded-full border border-accent-rose/20 bg-bg-elevated px-3 py-2 text-xs uppercase tracking-[0.18em] text-text-secondary transition hover:border-accent-rose/40 hover:text-text-primary"
+            >
+              Stop voice
+            </button>
+            <span className="rounded-full border border-accent-rose/15 bg-bg-elevated px-3 py-2 text-xs uppercase tracking-[0.18em] text-text-muted">
+              {speech.isSpeaking ? "Speaking" : "Voice idle"}
+            </span>
+          </div>
         </header>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -90,12 +137,25 @@ export default function ChatPage() {
           ))}
         </div>
 
-        <ChatWindow messages={messages} loading={loading} />
+        <ChatWindow
+          messages={messages}
+          loading={loading}
+          onSpeakMessage={handleSpeakMessage}
+          onStopSpeaking={handleStopSpeaking}
+          speakingMessageId={speech.isSpeaking ? lastSpokenIdRef.current ?? undefined : undefined}
+        />
         <div className="mt-4">
           <InputBar
             onSend={sendMessage}
             voiceActive={voice.isListening}
-            onVoiceToggle={() => (voice.isListening ? handleVoiceStopAndSend() : voice.start())}
+            onVoiceToggle={() => {
+              if (voice.isListening) {
+                handleVoiceStopAndSend();
+                return;
+              }
+              speech.stop();
+              voice.start();
+            }}
             liveTranscript={voice.transcript}
           />
         </div>

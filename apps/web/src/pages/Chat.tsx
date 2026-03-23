@@ -104,8 +104,8 @@ export default function ChatPage() {
   const moduleKeys: AppModule[] = ["fashion", "relationships", "health", "career"];
 
   return (
-    <main className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-4 p-4 lg:grid-cols-[300px_1fr]">
-      <aside className="hidden space-y-4 lg:block">
+    <main className="mx-auto grid h-[100dvh] max-h-[100dvh] max-w-7xl grid-cols-1 gap-4 overflow-hidden p-4 lg:grid-cols-[320px_1fr]">
+      <aside className="hidden h-full flex-col gap-4 overflow-hidden lg:flex">
         <ConversationList
           conversations={conversationsQuery.data?.conversations ?? []}
           activeConversationId={conversationId}
@@ -114,9 +114,9 @@ export default function ChatPage() {
           onSelectPrompt={handleQuickPrompt}
         />
         <ProfilePanel session={session} onLogout={logout} />
-        <section className="glass-card rounded-2xl p-4">
+        <section className="glass-card flex-1 overflow-hidden rounded-2xl p-4">
           <h3 className="font-display text-2xl">Memory</h3>
-          <div className="mt-3 space-y-2 text-sm text-text-secondary">
+          <div className="mt-3 max-h-[28vh] space-y-2 overflow-y-auto pr-1 text-sm text-text-secondary">
             {memory.data?.facts?.length ? (
               memory.data.facts.slice(0, 6).map((fact) => <p key={`${fact.key}:${fact.value}`}>{fact.key}: {fact.value}</p>)
             ) : (
@@ -126,8 +126,8 @@ export default function ChatPage() {
         </section>
       </aside>
 
-      <section className="glass-card flex min-h-[85vh] flex-col rounded-3xl p-4 md:p-5">
-        <header className="mb-4 flex items-center justify-between border-b border-accent-rose/15 pb-4">
+      <section className="glass-card flex h-full min-h-0 flex-col rounded-3xl p-4 md:p-5">
+        <header className="mb-4 flex shrink-0 items-center justify-between border-b border-accent-rose/15 pb-4">
           <div className="flex items-center gap-3">
             <RoseAvatar />
             <div>
@@ -149,7 +149,7 @@ export default function ChatPage() {
           </div>
         </header>
 
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex shrink-0 flex-wrap gap-2">
           {moduleKeys.map((key) => (
             <button
               key={key}
@@ -164,16 +164,18 @@ export default function ChatPage() {
           ))}
         </div>
 
-        <ChatWindow
-          messages={messages}
-          loading={loading}
-          onSpeakMessage={handleSpeakMessage}
-          onStopSpeaking={handleStopSpeaking}
-          speakingMessageId={speech.isSpeaking ? lastSpokenIdRef.current ?? undefined : undefined}
-          autoSpeak={autoSpeak}
-          onToggleAutoSpeak={() => setAutoSpeak((value) => !value)}
-        />
-        <div className="mt-4">
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ChatWindow
+            messages={messages}
+            loading={loading}
+            onSpeakMessage={handleSpeakMessage}
+            onStopSpeaking={handleStopSpeaking}
+            speakingMessageId={speech.isSpeaking ? lastSpokenIdRef.current ?? undefined : undefined}
+            autoSpeak={autoSpeak}
+            onToggleAutoSpeak={() => setAutoSpeak((value) => !value)}
+          />
+        </div>
+        <div className="mt-4 shrink-0">
           <InputBar
             onSend={sendMessage}
             voiceActive={voice.isListening}

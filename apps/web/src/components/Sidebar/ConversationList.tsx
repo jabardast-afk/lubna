@@ -16,7 +16,7 @@ export default function ConversationList({
   onSelectPrompt
 }: ConversationListProps) {
   return (
-    <div className="glass-card rounded-2xl p-4">
+    <div className="glass-card flex h-full min-h-0 flex-col rounded-2xl p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-display text-2xl">Conversations</h3>
         <button
@@ -28,8 +28,8 @@ export default function ConversationList({
         </button>
       </div>
       <p className="mt-1 text-xs uppercase tracking-[0.2em] text-text-muted">Recent chats and quick prompts</p>
-      <div className="mt-4 space-y-3">
-        <div className="space-y-2">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {conversations.length ? (
             conversations.map((conversation) => (
               <button

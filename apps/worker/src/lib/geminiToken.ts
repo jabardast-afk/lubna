@@ -7,7 +7,7 @@ interface StoredGeminiToken {
 }
 
 export async function getFreshGeminiToken(userId: string, env: Env): Promise<string> {
-  const raw = await env.KV.get(`user:${userId}:gemini_token`);
+  const raw = await env.lubna_kv.get(`user:${userId}:gemini_token`);
   if (!raw) throw new Error("No Gemini token for user");
 
   const token = JSON.parse(raw) as StoredGeminiToken;
@@ -40,6 +40,6 @@ export async function getFreshGeminiToken(userId: string, env: Env): Promise<str
     refresh_token: token.refresh_token ?? null,
     expires_at: Date.now() + data.expires_in * 1000
   };
-  await env.KV.put(`user:${userId}:gemini_token`, JSON.stringify(refreshed));
+  await env.lubna_kv.put(`user:${userId}:gemini_token`, JSON.stringify(refreshed));
   return refreshed.access_token;
 }

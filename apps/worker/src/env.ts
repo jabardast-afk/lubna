@@ -49,7 +49,7 @@ export interface Env {
   APP_URL?: string;
   FRONTEND_ORIGIN?: string;
   GOOGLE_CLOUD_PROJECT_ID?: string;
-  KV: KVNamespace;
+  lubna_kv: KVNamespace;
   DB: D1Database;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;

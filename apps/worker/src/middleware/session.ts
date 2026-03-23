@@ -30,7 +30,7 @@ export async function createSession(c: Context<AppBindings>, data: Omit<SessionP
     createdAt: Date.now(),
     ...data
   };
-  await c.env.KV.put(`session:${session.id}`, JSON.stringify(session), { expirationTtl: SESSION_TTL_SECONDS });
+  await c.env.lubna_kv.put(`session:${session.id}`, JSON.stringify(session), { expirationTtl: SESSION_TTL_SECONDS });
   setSessionCookieValue(c, session.id);
   return session;
 }
@@ -38,7 +38,7 @@ export async function createSession(c: Context<AppBindings>, data: Omit<SessionP
 export async function destroySession(c: Context<AppBindings>): Promise<void> {
   const sessionId = getCookie(c, SESSION_COOKIE);
   if (sessionId) {
-    await c.env.KV.delete(`session:${sessionId}`);
+    await c.env.lubna_kv.delete(`session:${sessionId}`);
   }
   clearSessionCookieValue(c);
 }
@@ -46,7 +46,7 @@ export async function destroySession(c: Context<AppBindings>): Promise<void> {
 export const sessionMiddleware: MiddlewareHandler<AppBindings> = async (c, next) => {
   const sessionId = getCookie(c, SESSION_COOKIE);
   if (sessionId) {
-    const raw = await c.env.KV.get(`session:${sessionId}`);
+    const raw = await c.env.lubna_kv.get(`session:${sessionId}`);
     const session = raw ? (JSON.parse(raw) as SessionPayload) : null;
     if (session) {
       c.set("session", session);

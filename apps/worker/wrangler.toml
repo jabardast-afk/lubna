@@ -12,10 +12,10 @@ GOOGLE_REDIRECT_URI = "https://lubna-worker.sandeepkumarbtech2012.workers.dev/au
 GOOGLE_CLIENT_ID = "245236117299-hpbhch5kqk5opnbgeqci2v4fhl59m4fu.apps.googleusercontent.com"
 
 [[kv_namespaces]]
-binding = "KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID_FROM_CLOUDFLARE_DASHBOARD"
+binding = "lubna_kv"
+id = "4d2f97eb26284d17b30250f185768b03"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "lubna-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID_FROM_CLOUDFLARE_DASHBOARD"
+database_id = "72f549d1-266e-489b-8ae2-549c0da70e24"

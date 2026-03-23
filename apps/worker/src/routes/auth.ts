@@ -99,11 +99,11 @@ async function callbackHandler(c: Context<AppBindings>) {
 
   const profile = (await profileResponse.json()) as GoogleProfile;
   const user = await upsertGoogleUser(c.env, profile);
-  const existingTokenRaw = await c.env.KV.get(`user:${profile.sub}:gemini_token`);
+  const existingTokenRaw = await c.env.lubna_kv.get(`user:${profile.sub}:gemini_token`);
   const existingToken = existingTokenRaw
     ? (JSON.parse(existingTokenRaw) as { refresh_token?: string })
     : null;
-  await c.env.KV.put(
+  await c.env.lubna_kv.put(
     `user:${profile.sub}:gemini_token`,
     JSON.stringify({
       access_token: tokenJson.access_token,

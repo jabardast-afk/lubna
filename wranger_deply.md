@@ -122,7 +122,7 @@ Secrets:
 
 Bindings:
 
-- KV binding name: `KV`
+- KV binding name: `lubna_kv`
 - D1 binding name: `DB`
 
 ## 11. Google OAuth Console

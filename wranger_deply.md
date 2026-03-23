@@ -65,7 +65,7 @@ Use the IDs shown in the Cloudflare dashboard after you create the resources.
 Load the schema into D1:
 
 ```bash
-pnpm --filter @lubna/worker exec wrangler d1 execute lubna-db --file=schema.sql
+pnpm --filter @lubna/worker exec wrangler d1 execute lubna-db --file=/workspaces/lubna/schema.sql
 ```
 
 ## 6. Set Worker Secret

@@ -1,10 +1,11 @@
 import { Navigate } from "react-router-dom";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useChat } from "@/hooks/useChat";
 import { useVoice } from "@/hooks/useVoice";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useMemory } from "@/hooks/useMemory";
+import { useConversations } from "@/hooks/useConversationHistory";
 import ChatWindow from "@/components/Chat/ChatWindow";
 import InputBar from "@/components/Chat/InputBar";
 import ConversationList from "@/components/Sidebar/ConversationList";
@@ -23,10 +24,15 @@ function RoseAvatar() {
 
 export default function ChatPage() {
   const { session, loading: authLoading, logout } = useAuth();
-  const { messages, loading, sendMessage, module, setModule } = useChat();
+  const { messages, loading, sendMessage, module, setModule, conversationId, loadConversation, startNewChat } = useChat();
   const voice = useVoice();
   const speech = useSpeech();
   const memory = useMemory();
+  const conversationsQuery = useConversations();
+  const [autoSpeak, setAutoSpeak] = useState(() => {
+    const stored = window.localStorage.getItem("lubna_auto_speak");
+    return stored ? stored === "true" : false;
+  });
   const lastSpokenIdRef = useRef<string | null>(null);
 
   const latestAssistantMessage = useMemo(
@@ -48,6 +54,16 @@ export default function ChatPage() {
     await sendMessage(prompt);
   };
 
+  const handleConversationSelect = async (selectedConversationId?: string) => {
+    speech.stop();
+    await loadConversation(selectedConversationId);
+  };
+
+  const handleNewChat = () => {
+    speech.stop();
+    startNewChat();
+  };
+
   const handleSpeakMessage = (message: (typeof messages)[number]) => {
     if (message.role !== "assistant") return;
     speech.speak(message.content);
@@ -59,14 +75,19 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    window.localStorage.setItem("lubna_auto_speak", String(autoSpeak));
+  }, [autoSpeak]);
+
+  useEffect(() => {
     if (!latestAssistantMessage) return;
     if (latestAssistantMessage.id === lastSpokenIdRef.current) return;
     if (loading) return;
     if (voice.isListening) return;
+    if (!autoSpeak) return;
     if (!speech.isSupported) return;
     speech.speak(latestAssistantMessage.content);
     lastSpokenIdRef.current = latestAssistantMessage.id;
-  }, [latestAssistantMessage, loading, speech, voice.isListening]);
+  }, [latestAssistantMessage, loading, speech, voice.isListening, autoSpeak]);
 
   if (authLoading) {
     return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
@@ -85,7 +106,13 @@ export default function ChatPage() {
   return (
     <main className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-4 p-4 lg:grid-cols-[300px_1fr]">
       <aside className="hidden space-y-4 lg:block">
-        <ConversationList onSelectPrompt={handleQuickPrompt} />
+        <ConversationList
+          conversations={conversationsQuery.data?.conversations ?? []}
+          activeConversationId={conversationId}
+          onSelectConversation={handleConversationSelect}
+          onNewChat={handleNewChat}
+          onSelectPrompt={handleQuickPrompt}
+        />
         <ProfilePanel session={session} onLogout={logout} />
         <section className="glass-card rounded-2xl p-4">
           <h3 className="font-display text-2xl">Memory</h3>
@@ -143,6 +170,8 @@ export default function ChatPage() {
           onSpeakMessage={handleSpeakMessage}
           onStopSpeaking={handleStopSpeaking}
           speakingMessageId={speech.isSpeaking ? lastSpokenIdRef.current ?? undefined : undefined}
+          autoSpeak={autoSpeak}
+          onToggleAutoSpeak={() => setAutoSpeak((value) => !value)}
         />
         <div className="mt-4">
           <InputBar

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppBindings, ChatInput } from "../env";
 import type { AppModule } from "@lubna/shared/types";
-import { ensureConversation, getMessagesForUser, insertMessage, listMemoryFacts, upsertMemoryFact } from "../lib/d1";
+import { ensureConversation, getMessagesForUser, insertMessage, listConversations, listMemoryFacts, upsertMemoryFact } from "../lib/d1";
 import { getFreshGeminiToken } from "../lib/geminiToken";
 
 function normalizeLimit(value: string | undefined, fallback = 20): number {
@@ -175,4 +175,13 @@ chatRoutes.get("/history/:n", async (c) => {
   const conversationId = c.req.query("conversationId") ?? undefined;
   const { conversation, messages } = await getMessagesForUser(c.env, user.id, limit, conversationId);
   return c.json({ conversation, messages });
+});
+
+chatRoutes.get("/conversations", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "unauthorized" }, 401);
+
+  const limit = normalizeLimit(c.req.query("limit"), 20);
+  const conversations = await listConversations(c.env, user.id, limit);
+  return c.json({ conversations });
 });

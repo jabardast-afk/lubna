@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppModule, ChatMessage } from "@lubna/shared/types";
-import { sendChatMessage } from "@/lib/gemini";
+import { getConversationHistory, sendChatMessage } from "@/lib/gemini";
 
 function uid() {
   return crypto.randomUUID();
@@ -11,6 +11,29 @@ export function useChat() {
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string>();
   const [module, setModule] = useState<AppModule>("general");
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const history = await getConversationHistory();
+        if (!active) return;
+        setConversationId(history.conversation?.id);
+        setMessages(history.messages.map((message) => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          language: message.language,
+          createdAt: message.created_at
+        })));
+      } catch {
+        // Ignore history load failures and let the user start fresh.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -49,11 +72,36 @@ export function useChat() {
     }
   };
 
+  const loadConversation = async (nextConversationId?: string) => {
+    setLoading(true);
+    try {
+      const history = await getConversationHistory(nextConversationId);
+      setConversationId(history.conversation?.id);
+      setMessages(history.messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        language: message.language,
+        createdAt: message.created_at
+      })));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startNewChat = () => {
+    setMessages([]);
+    setConversationId(undefined);
+  };
+
   return {
     messages,
     loading,
     module,
     setModule,
-    sendMessage
+    sendMessage,
+    conversationId,
+    loadConversation,
+    startNewChat
   };
 }

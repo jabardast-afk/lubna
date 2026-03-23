@@ -8,9 +8,11 @@ interface ChatWindowProps {
   onSpeakMessage?: (message: ChatMessage) => void;
   onStopSpeaking?: () => void;
   speakingMessageId?: string;
+  autoSpeak?: boolean;
+  onToggleAutoSpeak?: () => void;
 }
 
-export default function ChatWindow({ messages, loading, onSpeakMessage, onStopSpeaking, speakingMessageId }: ChatWindowProps) {
+export default function ChatWindow({ messages, loading, onSpeakMessage, onStopSpeaking, speakingMessageId, autoSpeak, onToggleAutoSpeak }: ChatWindowProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -19,6 +21,20 @@ export default function ChatWindow({ messages, loading, onSpeakMessage, onStopSp
 
   return (
     <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto pr-2">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent-rose/15 bg-bg-elevated/60 px-4 py-3 text-xs uppercase tracking-[0.18em] text-text-muted">
+        <span>Chat history</span>
+        {onToggleAutoSpeak && (
+          <button
+            type="button"
+            onClick={onToggleAutoSpeak}
+            className={`rounded-full border px-3 py-1 transition ${
+              autoSpeak ? "border-accent-rose/40 bg-accent-soft/20 text-text-primary" : "border-accent-rose/20 bg-bg-primary/40 text-text-secondary"
+            }`}
+          >
+            Auto speak: {autoSpeak ? "On" : "Off"}
+          </button>
+        )}
+      </div>
       {messages.map((message) => (
         <MessageBubble
           key={message.id}

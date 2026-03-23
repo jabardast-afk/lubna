@@ -79,6 +79,16 @@ export interface ConversationRow {
   updated_at: number;
 }
 
+export interface ConversationSummaryRow {
+  id: string;
+  title: string;
+  module?: string;
+  created_at: number;
+  updated_at: number;
+  message_count: number;
+  last_message?: string;
+}
+
 export interface MessageRow {
   id: string;
   conversation_id: string;

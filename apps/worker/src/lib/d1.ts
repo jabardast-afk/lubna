@@ -1,5 +1,5 @@
 import type { AppModule, UserPrefs } from "@lubna/shared/types";
-import type { ConversationRow, Env, GoogleProfile, MemoryRow, MessageRow, UserRecord } from "../env";
+import type { ConversationRow, ConversationSummaryRow, Env, GoogleProfile, MemoryRow, MessageRow, UserRecord } from "../env";
 
 function now(): number {
   return Date.now();
@@ -116,6 +116,37 @@ export async function getMessagesForUser(
     : await getLatestConversation(env, userId);
   if (!conversation) return { conversation: null, messages: [] };
   return { conversation, messages: await getConversationMessages(env, conversation.id, limit) };
+}
+
+export async function listConversations(env: Env, userId: string, limit = 20): Promise<ConversationSummaryRow[]> {
+  const result = await env.DB.prepare(
+    `
+    SELECT
+      c.id,
+      c.title,
+      c.module,
+      c.created_at,
+      c.updated_at,
+      COUNT(m.id) AS message_count,
+      (
+        SELECT content
+        FROM messages latest
+        WHERE latest.conversation_id = c.id
+        ORDER BY latest.created_at DESC
+        LIMIT 1
+      ) AS last_message
+    FROM conversations c
+    LEFT JOIN messages m ON m.conversation_id = c.id
+    WHERE c.user_id = ?
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC
+    LIMIT ?
+    `
+  )
+    .bind(userId, limit)
+    .all<ConversationSummaryRow>();
+
+  return result.results;
 }
 
 export async function upsertMemoryFact(

@@ -27,6 +27,9 @@ export interface MemoryFact {
 }
 
 export interface UserPrefs {
-  languagePref: string;
+  language: string;
+  theme?: string;
+  voiceId?: string | null;
+  languagePref?: string;
   tone?: "supportive" | "practical" | "balanced";
 }

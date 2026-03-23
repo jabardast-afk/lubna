@@ -49,6 +49,7 @@ export interface Env {
   APP_URL?: string;
   FRONTEND_ORIGIN?: string;
   GOOGLE_CLOUD_PROJECT_ID?: string;
+  ANTHROPIC_API_KEY?: string;
   lubna_kv: KVNamespace;
   DB: D1Database;
   GOOGLE_CLIENT_ID: string;
@@ -75,6 +76,9 @@ export interface ConversationRow {
   user_id: string;
   title: string;
   module?: string;
+  message_count: number;
+  last_message?: string;
+  kv_updated_at?: number;
   created_at: number;
   updated_at: number;
 }
@@ -100,9 +104,8 @@ export interface MessageRow {
 
 export interface MemoryRow {
   id: string;
-  user_id: string;
+  userId: string;
   key: string;
   value: string;
-  confidence: number;
-  updated_at: number;
+  updatedAt: number;
 }

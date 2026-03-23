@@ -42,6 +42,7 @@ app.use("/chat/*", guardrailsMiddleware);
 app.route("/auth", authRoutes);
 app.route("/chat", chatRoutes);
 app.route("/memory", memoryRoutes);
+app.route("/api/memory", memoryRoutes);
 app.route("/user", userRoutes);
 app.route("/voice", voiceRoutes);
 

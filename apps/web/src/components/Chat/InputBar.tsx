@@ -26,13 +26,13 @@ export default function InputBar({ onSend, voiceActive, onVoiceToggle, liveTrans
   };
 
   return (
-    <form onSubmit={submit} className="glass-card flex items-end gap-3 rounded-2xl p-3">
+    <form onSubmit={submit} className="glass-card flex items-end gap-3 rounded-[24px] p-3">
       <textarea
         value={value}
         onChange={(event) => setValue(event.target.value)}
         rows={1}
         placeholder="Tell Lubna what’s on your mind..."
-        className="max-h-28 min-h-[48px] flex-1 resize-y rounded-xl border border-transparent bg-bg-elevated px-4 py-3 text-text-primary outline-none placeholder:text-text-muted focus:border-accent-rose/30"
+        className="max-h-28 min-h-[48px] flex-1 resize-y rounded-2xl border border-transparent bg-bg-elevated px-4 py-3 text-text-primary outline-none placeholder:text-text-muted focus:border-accent-rose/30"
       />
       <button
         type="button"

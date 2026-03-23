@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { UserSession } from "@lubna/shared/types";
 
 interface ProfilePanelProps {
@@ -5,27 +6,59 @@ interface ProfilePanelProps {
   onLogout: () => Promise<void>;
 }
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export default function ProfilePanel({ session, onLogout }: ProfilePanelProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  const displayName = useMemo(() => session?.name ?? "Signed out", [session?.name]);
+
   return (
-    <div className="glass-card rounded-2xl p-4">
-      <h3 className="font-display text-2xl">You + Lubna</h3>
-      {session ? (
-        <div className="mt-3 space-y-3 text-sm text-text-secondary">
-          <div className="rounded-2xl border border-accent-rose/15 bg-bg-elevated/70 px-3 py-3">
-            <p className="font-medium text-text-primary">{session.name}</p>
-            <p className="mt-1 text-xs text-text-muted">{session.email}</p>
+    <div ref={rootRef} className="sticky bottom-0 shrink-0">
+      <div className="relative">
+        {open && session && (
+          <div className="absolute bottom-full left-0 right-0 mb-3 rounded-3xl border border-accent-rose/18 bg-bg-surface/95 p-4 shadow-[0_22px_50px_rgba(0,0,0,0.35)] backdrop-blur">
+            <p className="text-sm font-semibold text-text-primary">{session.name}</p>
+            <p className="mt-1 text-xs text-text-secondary">{session.email}</p>
+            <button
+              className="mt-4 w-full rounded-full border border-accent-rose/30 px-4 py-2 text-sm text-text-primary transition hover:bg-accent-rose/14"
+              onClick={onLogout}
+              type="button"
+            >
+              Log out
+            </button>
           </div>
-          <button
-            className="w-full rounded-full border border-accent-rose/35 px-4 py-2 text-text-primary transition hover:bg-accent-rose/15"
-            onClick={onLogout}
-            type="button"
-          >
-            Log out
-          </button>
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-text-muted">Signed out</p>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="flex w-full items-center gap-3 rounded-full border border-accent-rose/15 bg-bg-elevated/88 px-3 py-2 text-left transition hover:border-accent-rose/35"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft/28 text-xs font-semibold text-text-primary">
+            {initials(displayName)}
+          </span>
+          <span className="truncate text-sm text-text-primary">{displayName}</span>
+        </button>
+      </div>
     </div>
   );
 }

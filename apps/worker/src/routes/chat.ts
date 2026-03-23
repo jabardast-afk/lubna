@@ -1,8 +1,18 @@
 import { Hono } from "hono";
 import type { AppBindings, ChatInput } from "../env";
-import type { AppModule } from "@lubna/shared/types";
-import { ensureConversation, getMessagesForUser, insertMessage, listConversations, listMemoryFacts, upsertMemoryFact } from "../lib/d1";
+import type { AppModule, ChatMessage } from "@lubna/shared/types";
+import {
+  createConversation,
+  getConversationById,
+  getMessagesForUser,
+  listConversations,
+  listMemoryFacts,
+  pruneUserConversations,
+  updateConversationSnapshot
+} from "../lib/d1";
 import { getFreshGeminiToken } from "../lib/geminiToken";
+import { readChatHistory, writeChatHistory } from "../lib/kv";
+import { extractAndPersistMemories } from "./memory";
 
 function normalizeLimit(value: string | undefined, fallback = 20): number {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -11,19 +21,12 @@ function normalizeLimit(value: string | undefined, fallback = 20): number {
 }
 
 function detectLanguage(message: string): string {
+  if (/[\u4E00-\u9FFF]/.test(message)) return "zh";
   if (/[\u0980-\u09FF]/.test(message)) return "bn";
   if (/[\u0B80-\u0BFF]/.test(message)) return "ta";
   if (/[\u0900-\u097F]/.test(message)) return "hi";
   if (/[a-zA-Z]/.test(message) && /(yaar|nahi|mujhe|bohot|acha|haan)/i.test(message)) return "hinglish";
   return "en";
-}
-
-async function extractSimpleMemory(env: AppBindings["Bindings"], userId: string, message: string) {
-  const lower = message.toLowerCase();
-  const cityMatch = lower.match(/\b(?:i live in|from)\s+([a-z\s]+)/i);
-  if (cityMatch?.[1]) {
-    await upsertMemoryFact(env, userId, { key: "city", value: cityMatch[1].trim(), confidence: 0.8 });
-  }
 }
 
 function parseChatInput(body: unknown): ChatInput | null {
@@ -42,22 +45,23 @@ function parseChatInput(body: unknown): ChatInput | null {
 }
 
 function buildSystemPrompt(language: string, module: AppModule, memory: Awaited<ReturnType<typeof listMemoryFacts>>): string {
-  const memoryContext = memory.slice(0, 10).map((m) => `- ${m.key}: ${m.value}`).join("\n") || "(none yet)";
-  return [
-    "You are Lubna, a warm, witty, emotionally intelligent AI best friend for women.",
-    "Respond naturally and directly to the user's request.",
-    "Do not repeat or quote the user's message unless explicitly asked.",
-    "Match the user's language and code-switching style exactly.",
-    "For Hinglish, reply in natural Hinglish.",
-    "Validate emotion first when user is distressed, then give practical help.",
-    "For knowledge questions, give clear explanation with examples.",
-    "Never start with 'As an AI'.",
-    "Safety: refuse harmful instructions, handle crisis with empathy and resources.",
-    `Language hint: ${language}`,
-    `Module hint: ${module}`,
-    "Memory context:",
-    memoryContext
-  ].join("\n");
+  const memoryBlock = memory
+    .slice(0, 15)
+    .map((entry) => `- ${entry.key}: ${entry.value}`)
+    .join("\n");
+
+  return `You are Lubna — a confident, warm, witty, slightly spicy AI best friend.
+You speak naturally, like a real person, never robotic or formal.
+You give real talk, not generic advice. You remember who you're talking to.
+
+What you know about this user:
+${memoryBlock || "(none yet)"}
+
+Use this to personalise every response. Reference past context naturally when relevant.
+Never say "as an AI" — you are Lubna, full stop.
+
+Language hint: ${language}
+Module hint: ${module}`;
 }
 
 async function generateWithGemini(
@@ -101,9 +105,19 @@ async function generateWithGemini(
   const data = (await res.json()) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
+  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
   if (!text) throw new Error("Gemini returned empty response");
   return text;
+}
+
+function buildMessage(role: "user" | "assistant", content: string, language?: string): ChatMessage {
+  return {
+    id: crypto.randomUUID(),
+    role,
+    content,
+    language,
+    createdAt: Date.now()
+  };
 }
 
 export const chatRoutes = new Hono<AppBindings>();
@@ -116,18 +130,14 @@ chatRoutes.post("/message", async (c) => {
   if (!body?.message.trim()) return c.json({ error: "message is required" }, 400);
 
   const activeConversation = body.conversationId
-    ? await c.env.DB.prepare("SELECT * FROM conversations WHERE id = ? AND user_id = ? LIMIT 1").bind(body.conversationId, user.id).first<{ id: string }>()
-    : await ensureConversation(c.env, user.id, body.message.slice(0, 48), body.module);
+    ? await getConversationById(c.env, user.id, body.conversationId)
+    : await createConversation(c.env, user.id, body.message.slice(0, 48), body.module ?? "general");
   if (!activeConversation) return c.json({ error: "conversation not found" }, 404);
 
-  const language = body.language ?? detectLanguage(body.message);
-
-  await insertMessage(c.env, {
-    conversationId: activeConversation.id,
-    role: "user",
-    content: body.message,
-    language
-  });
+  const preferredLanguage = user.prefs.language && user.prefs.language !== "auto" ? user.prefs.language : undefined;
+  const language = body.language ?? preferredLanguage ?? detectLanguage(body.message);
+  const existingMessages = await readChatHistory(c.env, user.id, activeConversation.id);
+  const userMessage = buildMessage("user", body.message, language);
 
   const memory = await listMemoryFacts(c.env, user.id);
   let reply: string;
@@ -145,14 +155,23 @@ chatRoutes.post("/message", async (c) => {
     );
   }
 
-  const assistantMessage = await insertMessage(c.env, {
-    conversationId: activeConversation.id,
-    role: "assistant",
-    content: reply,
-    language
-  });
+  const assistantMessage = buildMessage("assistant", reply, language);
+  const nextMessages = [...existingMessages, userMessage, assistantMessage];
 
-  c.executionCtx?.waitUntil(extractSimpleMemory(c.env, user.id, body.message));
+  // Persist the full compressed message array so history is always recoverable from KV.
+  await writeChatHistory(c.env, user.id, activeConversation.id, nextMessages);
+  await updateConversationSnapshot(c.env, activeConversation.id, {
+    title: existingMessages.length ? undefined : body.message.slice(0, 48),
+    lastMessage: assistantMessage.content,
+    messageCount: nextMessages.length,
+    kvUpdatedAt: Date.now()
+  });
+  await pruneUserConversations(c.env, user.id, 20);
+
+  if (nextMessages.length >= 5 && nextMessages.length % 5 === 0) {
+    c.executionCtx?.waitUntil(extractAndPersistMemories(c, user.id, nextMessages));
+  }
+
   return c.json({
     reply: assistantMessage.content,
     language,
@@ -167,14 +186,35 @@ chatRoutes.post("/stream", async (c) => {
   return c.json({ stream: false, note: "stream route not implemented yet; use /chat/message for AI response" }, 501);
 });
 
+chatRoutes.post("/conversations/:id/finalize", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "unauthorized" }, 401);
+
+  const conversation = await getConversationById(c.env, user.id, c.req.param("id"));
+  if (!conversation) return c.json({ error: "conversation not found" }, 404);
+
+  const messages = await readChatHistory(c.env, user.id, conversation.id);
+  const facts = await extractAndPersistMemories(c, user.id, messages);
+  await updateConversationSnapshot(c.env, conversation.id, {
+    lastMessage: messages.at(-1)?.content,
+    messageCount: messages.length,
+    kvUpdatedAt: Date.now()
+  });
+
+  return c.json({ ok: true, facts });
+});
+
 chatRoutes.get("/history/:n", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: "unauthorized" }, 401);
 
   const limit = normalizeLimit(c.req.param("n"));
   const conversationId = c.req.query("conversationId") ?? undefined;
-  const { conversation, messages } = await getMessagesForUser(c.env, user.id, limit, conversationId);
-  return c.json({ conversation, messages });
+  const { conversation } = await getMessagesForUser(c.env, user.id, conversationId);
+  if (!conversation) return c.json({ conversation: null, messages: [] });
+
+  const messages = await readChatHistory(c.env, user.id, conversation.id);
+  return c.json({ conversation, messages: messages.slice(-limit) });
 });
 
 chatRoutes.get("/conversations", async (c) => {

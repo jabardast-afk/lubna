@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@lubna/shared": "workspace:*",
-    "hono": "^4.6.16"
+    "hono": "^4.6.16",
+    "lz-string": "^1.5.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250303.0",

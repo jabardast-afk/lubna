@@ -1,5 +1,6 @@
 import type { AppModule, UserPrefs } from "@lubna/shared/types";
-import type { ConversationRow, ConversationSummaryRow, Env, GoogleProfile, MemoryRow, MessageRow, UserRecord } from "../env";
+import type { ConversationRow, ConversationSummaryRow, Env, GoogleProfile, MemoryRow, UserRecord } from "../env";
+import { deleteChatHistory } from "./kv";
 
 function now(): number {
   return Date.now();
@@ -19,25 +20,55 @@ export async function upsertGoogleUser(env: Env, profile: GoogleProfile): Promis
     .bind(profile.sub, profile.email, profile.name, profile.picture ?? null, "auto", timestamp, timestamp)
     .run();
 
+  await env.DB.prepare(
+    `INSERT INTO user_preferences (userId, voiceId, language, theme, updatedAt)
+     VALUES (?, NULL, 'auto', 'midnight-rose', ?)
+     ON CONFLICT(userId) DO NOTHING`
+  )
+    .bind(profile.sub, timestamp)
+    .run();
+
   const user = await getUserById(env, profile.sub);
   if (!user) throw new Error("failed to upsert user");
   return user;
 }
 
 export async function getUserById(env: Env, userId: string): Promise<UserRecord | null> {
-  const row = await env.DB.prepare("SELECT * FROM users WHERE id = ? LIMIT 1").bind(userId).first<{
-    id: string;
-    email: string;
-    name: string;
-    picture?: string;
-    language_pref?: string;
-    created_at: number;
-    last_active?: number;
-  }>();
+  const row = await env.DB.prepare(
+    `SELECT
+       u.id,
+       u.email,
+       u.name,
+       u.picture,
+       u.created_at,
+       u.last_active,
+       COALESCE(p.language, u.language_pref, 'auto') AS language,
+       COALESCE(p.theme, 'midnight-rose') AS theme,
+       p.voiceId AS voiceId
+     FROM users u
+     LEFT JOIN user_preferences p ON p.userId = u.id
+     WHERE u.id = ?
+     LIMIT 1`
+  )
+    .bind(userId)
+    .first<{
+      id: string;
+      email: string;
+      name: string;
+      picture?: string;
+      created_at: number;
+      last_active?: number;
+      language: string;
+      theme: string;
+      voiceId?: string | null;
+    }>();
   if (!row) return null;
 
   const prefs: UserPrefs = {
-    languagePref: row.language_pref ?? "auto",
+    language: row.language ?? "auto",
+    languagePref: row.language ?? "auto",
+    theme: row.theme ?? "midnight-rose",
+    voiceId: row.voiceId ?? null,
     tone: "balanced"
   };
 
@@ -56,12 +87,19 @@ export async function createConversation(env: Env, userId: string, title: string
   const id = crypto.randomUUID();
   const timestamp = now();
   await env.DB.prepare(
-    `INSERT INTO conversations (id, user_id, title, module, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO conversations (id, user_id, title, module, message_count, last_message, kv_updated_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 0, NULL, NULL, ?, ?)`
   )
     .bind(id, userId, title, module, timestamp, timestamp)
     .run();
-  return (await env.DB.prepare("SELECT * FROM conversations WHERE id = ?").bind(id).first<ConversationRow>()) as ConversationRow;
+  return (await getConversationById(env, userId, id)) as ConversationRow;
+}
+
+export async function getConversationById(env: Env, userId: string, conversationId: string): Promise<ConversationRow | null> {
+  return env.DB
+    .prepare("SELECT * FROM conversations WHERE id = ? AND user_id = ? LIMIT 1")
+    .bind(conversationId, userId)
+    .first<ConversationRow>();
 }
 
 export async function getLatestConversation(env: Env, userId: string): Promise<ConversationRow | null> {
@@ -71,77 +109,49 @@ export async function getLatestConversation(env: Env, userId: string): Promise<C
     .first<ConversationRow>();
 }
 
-export async function ensureConversation(env: Env, userId: string, title: string, module: AppModule = "general"): Promise<ConversationRow> {
-  const latest = await getLatestConversation(env, userId);
-  if (latest) return latest;
-  return createConversation(env, userId, title, module);
-}
-
-export async function touchConversation(env: Env, conversationId: string): Promise<void> {
-  await env.DB.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?").bind(now(), conversationId).run();
-}
-
-export async function insertMessage(
+export async function updateConversationSnapshot(
   env: Env,
-  input: { conversationId: string; role: MessageRow["role"]; content: string; language?: string }
-): Promise<MessageRow> {
-  const id = crypto.randomUUID();
-  const timestamp = now();
+  conversationId: string,
+  input: { title?: string; lastMessage?: string; messageCount: number; kvUpdatedAt?: number }
+): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO messages (id, conversation_id, role, content, language, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `UPDATE conversations
+     SET title = COALESCE(?, title),
+         last_message = ?,
+         message_count = ?,
+         kv_updated_at = ?,
+         updated_at = ?
+     WHERE id = ?`
   )
-    .bind(id, input.conversationId, input.role, input.content, input.language ?? null, timestamp)
+    .bind(input.title ?? null, input.lastMessage ?? null, input.messageCount, input.kvUpdatedAt ?? now(), now(), conversationId)
     .run();
-  await touchConversation(env, input.conversationId);
-  return (await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first<MessageRow>()) as MessageRow;
-}
-
-export async function getConversationMessages(env: Env, conversationId: string, limit = 20): Promise<MessageRow[]> {
-  const result = await env.DB
-    .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ?")
-    .bind(conversationId, limit)
-    .all<MessageRow>();
-  return result.results.reverse();
 }
 
 export async function getMessagesForUser(
   env: Env,
   userId: string,
-  limit = 20,
   conversationId?: string
-): Promise<{ conversation: ConversationRow | null; messages: MessageRow[] }> {
+): Promise<{ conversation: ConversationRow | null }> {
   const conversation = conversationId
-    ? await env.DB.prepare("SELECT * FROM conversations WHERE id = ? AND user_id = ? LIMIT 1").bind(conversationId, userId).first<ConversationRow>()
+    ? await getConversationById(env, userId, conversationId)
     : await getLatestConversation(env, userId);
-  if (!conversation) return { conversation: null, messages: [] };
-  return { conversation, messages: await getConversationMessages(env, conversation.id, limit) };
+  return { conversation };
 }
 
 export async function listConversations(env: Env, userId: string, limit = 20): Promise<ConversationSummaryRow[]> {
   const result = await env.DB.prepare(
-    `
-    SELECT
-      c.id,
-      c.title,
-      c.module,
-      c.created_at,
-      c.updated_at,
-      COUNT(m.id) AS message_count,
-      (
-        SELECT content
-        FROM messages latest
-        WHERE latest.conversation_id = c.id
-        ORDER BY latest.created_at DESC
-        LIMIT 1
-      ) AS last_message
-    FROM conversations c
-    LEFT JOIN messages m ON m.conversation_id = c.id
-    WHERE c.user_id = ?
-    GROUP BY c.id
-    ORDER BY c.updated_at DESC
-    LIMIT ?
-    `
+    `SELECT
+       id,
+       title,
+       module,
+       created_at,
+       updated_at,
+       message_count,
+       last_message
+     FROM conversations
+     WHERE user_id = ?
+     ORDER BY updated_at DESC
+     LIMIT ?`
   )
     .bind(userId, limit)
     .all<ConversationSummaryRow>();
@@ -149,53 +159,93 @@ export async function listConversations(env: Env, userId: string, limit = 20): P
   return result.results;
 }
 
+export async function pruneUserConversations(env: Env, userId: string, keep = 20): Promise<void> {
+  const overflow = await env.DB.prepare(
+    `SELECT id
+     FROM conversations
+     WHERE user_id = ?
+     ORDER BY updated_at DESC
+     LIMIT -1 OFFSET ?`
+  )
+    .bind(userId, keep)
+    .all<{ id: string }>();
+
+  for (const conversation of overflow.results) {
+    await env.DB.prepare("DELETE FROM messages WHERE conversation_id = ?").bind(conversation.id).run();
+    await env.DB.prepare("DELETE FROM conversations WHERE id = ? AND user_id = ?").bind(conversation.id, userId).run();
+    await deleteChatHistory(env, userId, conversation.id);
+  }
+}
+
 export async function upsertMemoryFact(
   env: Env,
   userId: string,
-  input: { key: string; value: string; confidence?: number }
+  input: { key: string; value: string }
 ): Promise<MemoryRow> {
   const id = crypto.randomUUID();
   const timestamp = now();
   const normalizedKey = input.key.trim().toLowerCase();
   await env.DB.prepare(
-    `INSERT INTO memory (id, user_id, key, value, confidence, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(user_id, key) DO UPDATE SET
+    `INSERT INTO user_memory (id, userId, key, value, updatedAt)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(userId, key) DO UPDATE SET
        value = excluded.value,
-       confidence = excluded.confidence,
-       updated_at = excluded.updated_at`
+       updatedAt = excluded.updatedAt`
   )
-    .bind(id, userId, normalizedKey, input.value, input.confidence ?? 0.8, timestamp)
+    .bind(id, userId, normalizedKey, input.value.trim(), timestamp)
     .run();
 
-  return (await env.DB.prepare("SELECT * FROM memory WHERE user_id = ? AND key = ? LIMIT 1").bind(userId, normalizedKey).first<MemoryRow>()) as MemoryRow;
+  return (await env.DB.prepare("SELECT * FROM user_memory WHERE userId = ? AND key = ? LIMIT 1").bind(userId, normalizedKey).first<MemoryRow>()) as MemoryRow;
 }
 
 export async function listMemoryFacts(env: Env, userId: string): Promise<MemoryRow[]> {
-  const result = await env.DB.prepare("SELECT * FROM memory WHERE user_id = ? ORDER BY updated_at DESC").bind(userId).all<MemoryRow>();
+  const result = await env.DB.prepare("SELECT * FROM user_memory WHERE userId = ? ORDER BY updatedAt DESC").bind(userId).all<MemoryRow>();
   return result.results;
 }
 
 export async function getMemoryFact(env: Env, userId: string, key: string): Promise<MemoryRow | null> {
   return env.DB
-    .prepare("SELECT * FROM memory WHERE user_id = ? AND key = ? LIMIT 1")
+    .prepare("SELECT * FROM user_memory WHERE userId = ? AND key = ? LIMIT 1")
     .bind(userId, key.trim().toLowerCase())
     .first<MemoryRow>();
 }
 
 export async function deleteMemoryFact(env: Env, userId: string, key?: string): Promise<boolean> {
   const statement = key
-    ? env.DB.prepare("DELETE FROM memory WHERE user_id = ? AND key = ?").bind(userId, key.trim().toLowerCase())
-    : env.DB.prepare("DELETE FROM memory WHERE user_id = ?").bind(userId);
+    ? env.DB.prepare("DELETE FROM user_memory WHERE userId = ? AND key = ?").bind(userId, key.trim().toLowerCase())
+    : env.DB.prepare("DELETE FROM user_memory WHERE userId = ?").bind(userId);
   const result = await statement.run();
   return (result.meta.changes ?? 0) > 0;
 }
 
-export async function patchUserPrefs(env: Env, userId: string, patch: Partial<UserPrefs>): Promise<UserRecord> {
-  const nextLanguage = patch.languagePref ?? "auto";
+export async function patchUserPrefs(
+  env: Env,
+  userId: string,
+  patch: Partial<Pick<UserPrefs, "language" | "theme" | "voiceId">>
+): Promise<UserRecord> {
+  const existing = await getUserById(env, userId);
+  if (!existing) throw new Error("user not found");
+
+  const nextLanguage = patch.language ?? existing.prefs.language ?? existing.prefs.languagePref ?? "auto";
+  const nextTheme = patch.theme ?? existing.prefs.theme ?? "midnight-rose";
+  const nextVoiceId = patch.voiceId === undefined ? existing.prefs.voiceId ?? null : patch.voiceId;
+
+  await env.DB.prepare(
+    `INSERT INTO user_preferences (userId, voiceId, language, theme, updatedAt)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(userId) DO UPDATE SET
+       voiceId = excluded.voiceId,
+       language = excluded.language,
+       theme = excluded.theme,
+       updatedAt = excluded.updatedAt`
+  )
+    .bind(userId, nextVoiceId, nextLanguage, nextTheme, now())
+    .run();
+
   await env.DB.prepare("UPDATE users SET language_pref = ?, last_active = ? WHERE id = ?")
     .bind(nextLanguage, now(), userId)
     .run();
+
   const user = await getUserById(env, userId);
   if (!user) throw new Error("user not found");
   return user;

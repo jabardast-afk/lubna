@@ -112,18 +112,22 @@ export default function MessageBubble({ message, onSpeak, onStopSpeaking, isSpea
   const isUser = message.role === "user";
   const isAssistant = !isUser;
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fadeRise`}>
+    <div className={`group flex ${isUser ? "justify-end" : "justify-start"} animate-fadeRise`}>
       <div
-        className={`max-w-[90%] rounded-3xl px-4 py-3 text-[15px] leading-relaxed md:max-w-[72%] ${
-          isUser ? "bg-bubble-user text-text-primary" : "bg-bubble-lubna text-text-primary shadow-[inset_0_0_16px_rgba(201,116,138,0.14)]"
+        className={`max-w-[72%] px-4 py-3 text-[15px] leading-[1.7] shadow-[0_8px_30px_rgba(0,0,0,0.16)] ${
+          isUser
+            ? "rounded-[18px_18px_4px_18px] bg-accent-rose text-bg-primary"
+            : "rounded-[18px_18px_18px_4px] bg-bubble-lubna text-text-primary shadow-[inset_0_0_16px_rgba(201,116,138,0.14)]"
         }`}
       >
         <div className="whitespace-pre-wrap">
           {renderContent(message.content)}
         </div>
-        {isAssistant && (
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-accent-rose/10 pt-2 text-xs uppercase tracking-[0.18em] text-text-muted">
-            <span>Lubna reply</span>
+        <div className={`mt-3 flex items-center justify-between gap-3 pt-2 text-[11px] text-text-muted ${isAssistant ? "border-t border-accent-rose/10" : ""}`}>
+          <span className="opacity-0 transition-opacity group-hover:opacity-100">
+            {new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          </span>
+          {isAssistant && (
             <button
               type="button"
               onClick={() => {
@@ -137,8 +141,8 @@ export default function MessageBubble({ message, onSpeak, onStopSpeaking, isSpea
             >
               {isSpeaking ? "Stop" : "Speak"}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

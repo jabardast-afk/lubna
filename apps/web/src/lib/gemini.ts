@@ -10,6 +10,20 @@ export interface ChatResponse {
   language: string;
 }
 
+export interface UserProfileResponse {
+  prefs: {
+    language: string;
+    theme?: string;
+    voiceId?: string | null;
+  };
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    picture?: string;
+  };
+}
+
 export interface ConversationSummary {
   id: string;
   title: string;
@@ -25,7 +39,7 @@ export interface ConversationHistoryResponse {
     id: string;
     title: string;
     module?: string;
-    created_at: number;
+    created_at?: number;
     updated_at: number;
   } | null;
   messages: Array<{
@@ -34,13 +48,21 @@ export interface ConversationHistoryResponse {
     content: string;
     language?: string;
     created_at: number;
+    createdAt?: number;
   }>;
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
+function apiUrl(path: string) {
+  if (API_BASE) {
+    return `${API_BASE}${path}`;
+  }
+  return path;
+}
+
 export async function sendChatMessage(payload: ChatRequest): Promise<ChatResponse> {
-  const res = await fetch(`${API_BASE}/chat/message`, {
+  const res = await fetch(apiUrl("/chat/message"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -56,13 +78,13 @@ export async function sendChatMessage(payload: ChatRequest): Promise<ChatRespons
 }
 
 export async function getSession() {
-  const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+  const res = await fetch(apiUrl("/auth/me"), { credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function getConversationHistory(conversationId?: string) {
-  const url = new URL(`${API_BASE}/chat/history/100`);
+  const url = new URL(apiUrl("/chat/history/100"), window.location.origin);
   if (conversationId) {
     url.searchParams.set("conversationId", conversationId);
   }
@@ -74,9 +96,54 @@ export async function getConversationHistory(conversationId?: string) {
 }
 
 export async function listConversations() {
-  const res = await fetch(`${API_BASE}/chat/conversations?limit=20`, { credentials: "include" });
+  const res = await fetch(apiUrl("/chat/conversations?limit=20"), { credentials: "include" });
   if (!res.ok) {
     throw new Error("Failed to fetch conversations");
   }
   return (await res.json()) as { conversations: ConversationSummary[] };
+}
+
+export async function finalizeConversation(conversationId: string) {
+  const res = await fetch(apiUrl(`/chat/conversations/${conversationId}/finalize`), {
+    method: "POST",
+    credentials: "include"
+  });
+  if (!res.ok) {
+    throw new Error("Failed to finalize conversation");
+  }
+  return res.json();
+}
+
+export async function extractConversationMemory(messages: ConversationHistoryResponse["messages"]) {
+  const res = await fetch(apiUrl("/api/memory/extract"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ messages })
+  });
+  if (!res.ok) {
+    throw new Error("Failed to extract memory");
+  }
+  return res.json();
+}
+
+export async function getUserProfile() {
+  const res = await fetch(apiUrl("/user/profile"), { credentials: "include" });
+  if (!res.ok) {
+    throw new Error("Failed to fetch user profile");
+  }
+  return (await res.json()) as UserProfileResponse;
+}
+
+export async function updateUserPreferences(payload: { language?: string; theme?: string; voiceId?: string | null }) {
+  const res = await fetch(apiUrl("/user/prefs"), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    throw new Error("Failed to update preferences");
+  }
+  return res.json();
 }

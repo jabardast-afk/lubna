@@ -27,7 +27,7 @@ userRoutes.patch("/prefs", async (c) => {
     return c.json({ error: "unauthorized" }, 401);
   }
 
-  const body = (await c.req.json().catch(() => null)) as { languagePref?: string; tone?: "supportive" | "practical" | "balanced" } | null;
+  const body = (await c.req.json().catch(() => null)) as { language?: string; theme?: string; voiceId?: string | null } | null;
   if (!body) {
     return c.json({ error: "invalid payload" }, 400);
   }

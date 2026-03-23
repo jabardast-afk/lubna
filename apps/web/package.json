@@ -23,8 +23,9 @@
     "@capacitor/push-notifications": "^5.1.2",
     "@capacitor/share": "^5.0.7",
     "@capacitor/status-bar": "^5.0.7",
-    "@tanstack/react-query": "^5.66.5",
     "@lubna/shared": "workspace:*",
+    "@tanstack/react-query": "^5.66.5",
+    "lz-string": "^1.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.0"

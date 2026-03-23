@@ -3,6 +3,9 @@ CREATE TABLE IF NOT EXISTS conversations (
   user_id TEXT NOT NULL,
   title TEXT,
   module TEXT,
+  message_count INTEGER NOT NULL DEFAULT 0,
+  last_message TEXT,
+  kv_updated_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -35,4 +38,22 @@ CREATE TABLE IF NOT EXISTS users (
   language_pref TEXT DEFAULT 'auto',
   created_at INTEGER NOT NULL,
   last_active INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS user_memory (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updatedAt INTEGER NOT NULL,
+  UNIQUE (userId, key)
+);
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+  userId TEXT PRIMARY KEY,
+  voiceId TEXT,
+  language TEXT DEFAULT 'auto',
+  theme TEXT DEFAULT 'midnight-rose',
+  updatedAt INTEGER NOT NULL,
+  FOREIGN KEY (userId) REFERENCES users(id)
 );
